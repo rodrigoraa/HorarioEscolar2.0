@@ -1,0 +1,7 @@
+streamlit
+pandas
+openpyxl
+streamlit-authenticator>=0.3.0
+bcrypt
+pyyaml
+xlsxwriter
