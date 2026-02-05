@@ -7,7 +7,6 @@ def rodar_solver(turmas_config, grade_aulas, dias_semana, itinerarios_lista=[], 
     model = cp_model.CpModel()
     qtd_dias = len(dias_semana)
 
-    # Variáveis
     horario = {} 
     vars_list = defaultdict(list)
     custo_total = [] 
@@ -18,13 +17,11 @@ def rodar_solver(turmas_config, grade_aulas, dias_semana, itinerarios_lista=[], 
         carga = turmas_config.get(nome_turma, 25)
         return 6 if carga > 25 else 5
 
-    # --- 1. CRIAÇÃO DAS VARIÁVEIS ---
     for item in grade_aulas:
         t, p, m = item['turma'], item['prof'], item['materia']
         
-        # [CORREÇÃO] Agora lemos duas listas de bloqueio: Dias Inteiros e Slots Específicos
         bloqueios_dias = item.get('bloqueios_indices', []) 
-        bloqueios_slots = item.get('bloqueios_slots', []) # Novo! Ex: [(2, 3)] = Qua 4ª aula
+        bloqueios_slots = item.get('bloqueios_slots', [])
 
         slots_desta_turma = get_slots_da_turma(t, m)
         eh_itinerario = (m in itinerarios_lista)
@@ -35,12 +32,9 @@ def rodar_solver(turmas_config, grade_aulas, dias_semana, itinerarios_lista=[], 
                 horario[(t, d, a, p, m)] = v
                 mapa_vars[t][m][d].append(v)
 
-                # Regra 1: Bloqueio de Dia Inteiro (Ex: "Seg")
                 if d in bloqueios_dias: 
                     model.Add(v == 0)
 
-                # Regra 2: Bloqueio Específico (Ex: "Qua:4")
-                # A lista bloqueios_slots contém tuplas (dia, aula)
                 if (d, a) in bloqueios_slots:
                     model.Add(v == 0)
 
@@ -54,7 +48,6 @@ def rodar_solver(turmas_config, grade_aulas, dias_semana, itinerarios_lista=[], 
                 vars_list[f'prof_dia_geral_{p}_{d}'].append(v)
                 vars_list[f'prof_turma_materia_dia_{p}_{t}_{m}_{d}'].append(v)
 
-    # --- 2. REGRAS BÁSICAS (HARD) ---
     processed_items = set()
     for item in grade_aulas:
         key = (item['turma'], item['prof'], item['materia'])
@@ -84,7 +77,6 @@ def rodar_solver(turmas_config, grade_aulas, dias_semana, itinerarios_lista=[], 
             model.AddMultiplicationEquality(sq, [soma, soma])
             custo_total.append(sq * 10) 
 
-    # --- 3. REGRAS DE DOBRADINHA ---
     for item in grade_aulas:
         p = item['prof']
         t = item['turma']
@@ -105,7 +97,6 @@ def rodar_solver(turmas_config, grade_aulas, dias_semana, itinerarios_lista=[], 
                 model.Add(soma_aulas <= 1).OnlyEnforceIf(tem_dobradinha.Not())
                 custo_total.append(tem_dobradinha * 100000)
             
-    # --- DEMAIS REGRAS ---
     prof_dia_map = defaultdict(lambda: {'normal': [], 'ha': []})
     for (t, d, a, p, m), v in horario.items():
         k = 'ha' if m == 'Hora Atividade' else 'normal'
