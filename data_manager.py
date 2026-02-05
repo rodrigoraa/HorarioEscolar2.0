@@ -3,7 +3,8 @@ import math
 
 def carregar_e_validar_dados(arquivo):
     """
-    Lê o Excel, processa turmas e TRADUZ as indisponibilidades de texto para números.
+    Lê o Excel, processa turmas e TRADUZ as indisponibilidades.
+    Agora suporta formato 'DIA' (dia todo) e 'DIA:AULA' (aula específica).
     """
     erros = []
     avisos = []
@@ -16,6 +17,7 @@ def carregar_e_validar_dados(arquivo):
 
     turmas_config = {} 
     
+    # --- 1. CONFIGURAÇÃO DAS TURMAS ---
     for _, row in df_turmas.iterrows():
         nome = str(row['Turma']).strip()
         carga = row.get('Aulas_Semanais', '25')
@@ -25,35 +27,63 @@ def carregar_e_validar_dados(arquivo):
             turmas_config[nome] = 25 
             avisos.append(f"Turma '{nome}' com carga inválida. Assumindo 25.")
 
-    def traduzir_dias(texto_bruto):
+    # --- 2. FUNÇÃO DE TRADUÇÃO MELHORADA ---
+    def processar_indisponibilidades(texto_bruto):
+        """
+        Retorna duas listas:
+        1. Dias inteiros bloqueados (ex: [0, 4])
+        2. Slots específicos bloqueados (ex: [(2, 3)]) -> (Quarta, 4ª aula)
+        """
+        bloqueios_dias = []
+        bloqueios_slots = []
+        
         if pd.isna(texto_bruto) or str(texto_bruto).strip() == '':
-            return []
+            return [], []
         
         texto = str(texto_bruto).upper()
-        mapa = {
-            'SEG': 0, 'TER': 1, 'QUA': 2, 'QUI': 3, 'SEX': 4, 'SAB': 5, 'DOM': 6
-        }
+        # Mapa simples para identificar o dia
+        mapa = {'SEG': 0, 'TER': 1, 'QUA': 2, 'QUI': 3, 'SEX': 4, 'SAB': 5, 'DOM': 6}
         
-        indices = set()
-        partes = texto.replace(';', ',').replace(' ', ',').split(',')
+        # Separa por vírgula ou ponto e vírgula
+        partes = texto.replace(';', ',').replace(' ', '').split(',')
         
         for p in partes:
-            p = p.strip()
             if not p: continue
             
+            # Verifica qual dia da semana está escrito neste pedaço
+            dia_idx = -1
             for chave, valor in mapa.items():
                 if chave in p:
-                    indices.add(valor)
-        
-        return sorted(list(indices))
+                    dia_idx = valor
+                    break
+            
+            if dia_idx == -1: continue # Não achou dia válido (ex: erro de digitação)
 
+            # Agora verifica se é DIA INTEIRO ou SLOT ESPECÍFICO
+            if ':' in p:
+                try:
+                    # Exemplo: QUA:4 -> pega o '4'
+                    _, aula_str = p.split(':')
+                    aula_idx = int(aula_str) - 1 # Transforma 1 em 0 (índice)
+                    bloqueios_slots.append((dia_idx, aula_idx))
+                except:
+                    # Se der erro ao ler o número, ignora
+                    pass
+            else:
+                # Se não tem ':', é bloqueio do dia inteiro
+                bloqueios_dias.append(dia_idx)
+        
+        # Remove duplicatas e ordena
+        return sorted(list(set(bloqueios_dias))), sorted(list(set(bloqueios_slots)))
+
+    # --- 3. LEITURA DA GRADE ---
     grade_aulas = []
     cols_req = {'Professor', 'Materia', 'Turmas_Alvo', 'Aulas_Por_Turma'}
     
     if not cols_req.issubset(df_grade.columns):
         return None, None, [f"Faltam colunas na aba Grade_Curricular: {cols_req}"], []
 
-    print("\n>>> INICIANDO LEITURA DAS INDISPONIBILIDADES:")
+    print("\n>>> INICIANDO LEITURA DAS INDISPONIBILIDADES (COM SUPORTE A HORÁRIOS):")
     
     for idx, row in df_grade.iterrows():
         prof = str(row['Professor']).strip()
@@ -63,7 +93,8 @@ def carregar_e_validar_dados(arquivo):
         
         bloq_raw = row.get('Indisponibilidade', '')
         
-        bloqueios_indices = traduzir_dias(bloq_raw)
+        # AQUI CHAMAMOS A NOVA FUNÇÃO
+        b_dias, b_slots = processar_indisponibilidades(bloq_raw)
 
         if not prof or not mat or not turmas_str: continue
 
@@ -87,7 +118,8 @@ def carregar_e_validar_dados(arquivo):
                 'materia': mat,
                 'turma': turma,
                 'qtd': qtd,
-                'bloqueios_indices': bloqueios_indices 
+                'bloqueios_indices': b_dias,  # Dias Inteiros
+                'bloqueios_slots': b_slots    # Aulas Específicas (NOVO)
             })
 
     print(">>> FIM DA LEITURA.\n")

@@ -182,6 +182,27 @@ if arquivo:
         st.session_state['horario_gerado'] = False
         st.session_state['dados_solucao'] = {}
 
+    st.markdown("### ⚙️ Preferências de Geração")
+    
+    usar_dobradinhas = st.toggle(
+        "Permitir Dobradinhas (Aulas seguidas)?", 
+        value=True,
+        help="Ativado: Você pode escolher quem dobra. Desativado: O sistema tenta separar as aulas de TODOS os professores."
+    )
+    
+    lista_todos_profs = sorted(list(set([i['prof'] for i in grade_aulas])))    
+    
+    if usar_dobradinhas:
+        st.info("Selecione abaixo APENAS os professores que podem ter dobradinha.")
+        profs_dobradinha = st.multiselect(
+            "Quais professores podem dobrar?",
+            options=lista_todos_profs,
+            default=lista_todos_profs,
+            help="Remova da lista quem você quer que tenha aulas separadas."
+        )
+    else:
+        profs_dobradinha = []
+
     if st.button("🚀 Gerar Horário (Modo Blindado)"):
         
         with st.spinner("Preparando resultados. . ."):
@@ -230,7 +251,8 @@ if arquivo:
                 dias,
                 itinerarios_selecionados,
                 slots_itinerario_idx,
-                st.session_state['grupos_sincronia']      
+                st.session_state['grupos_sincronia'],
+                professores_com_dobradinha=profs_dobradinha
             )
                 
             if status == "SUCESSO":
