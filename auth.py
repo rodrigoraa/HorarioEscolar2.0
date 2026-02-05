@@ -1,15 +1,12 @@
-# CAMADA DE SEGURANÇA
 import streamlit as st
 import streamlit_authenticator as stauth
 
-# --- FUNÇÃO AUXILIAR ---
 def converter_para_dict_puro(objeto_streamlit):
     if hasattr(objeto_streamlit, 'items'):
         return {k: converter_para_dict_puro(v) for k, v in objeto_streamlit.items()}
     else:
         return objeto_streamlit
 
-# --- CSS RESPONSIVO (Funciona no Dark e Light Mode) ---
 def aplicar_estilo_login():
     st.markdown("""
         <style>
@@ -33,7 +30,6 @@ def aplicar_estilo_login():
         </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÃO PRINCIPAL ---
 def verificar_login():
     try:
         config_full = converter_para_dict_puro(st.secrets)
@@ -50,36 +46,27 @@ def verificar_login():
         cookie['expiry_days']
     )
 
-    # Se já estiver logado, retorna direto
     if st.session_state.get("authentication_status"):
         return True, st.session_state["name"], authenticator
 
-    # --- DESENHO DA TELA ---
     aplicar_estilo_login()
     
-    # Colunas para centralizar: [Espaço, Login, Espaço]
     col1, col2, col3 = st.columns([1, 1.5, 1])
 
     with col2:
-        # Espaço em branco
         st.write("") 
         
-        # 1. ÍCONE / LOGO (Centralizado)
-        # Usa colunas internas para centralizar a imagem/emoji perfeitamente
         c_img_1, c_img_2, c_img_3 = st.columns([1, 1, 1])
         with c_img_2:
             st.header("🎓") 
-            # para usar imagem, comente a linha acima e use:
+            # para usar logo:
             # st.image("sua_logo.png", width=100)
 
-        # 2. TEXTOS (Usando componentes nativos para cor automática)
         st.markdown("<h3 style='text-align: center;'>Acesso Restrito</h3>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; opacity: 0.7;'>Sistema Gerador de Horários</p>", unsafe_allow_html=True)
 
-        # 3. LOGIN FORM
         authenticator.login(location='main', key='login_form')
 
-    # --- VERIFICAÇÃO ---
     if st.session_state["authentication_status"] is False:
         with col2:
             st.error("❌ Usuário ou senha incorretos")

@@ -14,7 +14,6 @@ def carregar_e_validar_dados(arquivo):
     except Exception as e:
         return None, None, [f"Erro ao abrir arquivo Excel: {str(e)}"], []
 
-    # --- 1. PROCESSAR TURMAS ---
     turmas_config = {} 
     
     for _, row in df_turmas.iterrows():
@@ -26,46 +25,44 @@ def carregar_e_validar_dados(arquivo):
             turmas_config[nome] = 25 
             avisos.append(f"Turma '{nome}' com carga inválida. Assumindo 25.")
 
-    # --- 2. FUNÇÃO AUXILIAR: TRADUZIR DIAS ---
     def traduzir_dias(texto_bruto):
         if pd.isna(texto_bruto) or str(texto_bruto).strip() == '':
             return []
         
         texto = str(texto_bruto).upper()
-        # Mapeamento flexível (pega 'SEG', 'SEGUNDA', '2ª', etc)
         mapa = {
             'SEG': 0, 'TER': 1, 'QUA': 2, 'QUI': 3, 'SEX': 4, 'SAB': 5, 'DOM': 6
         }
         
         indices = set()
-        # Separa por vírgula, ponto e vírgula ou espaço
         partes = texto.replace(';', ',').replace(' ', ',').split(',')
         
         for p in partes:
             p = p.strip()
+            if not p: continue
+            
             for chave, valor in mapa.items():
-                if chave in p: # Se "SEG" estiver dentro de "SEGUNDA"
+                if chave in p:
                     indices.add(valor)
         
-        return list(indices)
+        return sorted(list(indices))
 
-    # --- 3. PROCESSAR GRADE ---
     grade_aulas = []
     cols_req = {'Professor', 'Materia', 'Turmas_Alvo', 'Aulas_Por_Turma'}
     
     if not cols_req.issubset(df_grade.columns):
         return None, None, [f"Faltam colunas na aba Grade_Curricular: {cols_req}"], []
 
+    print("\n>>> INICIANDO LEITURA DAS INDISPONIBILIDADES:")
+    
     for idx, row in df_grade.iterrows():
         prof = str(row['Professor']).strip()
         mat = str(row['Materia']).strip()
         turmas_str = str(row['Turmas_Alvo']).strip()
         qtd_str = str(row['Aulas_Por_Turma']).strip()
         
-        # Lê a indisponibilidade (Ex: "Seg, Sex")
         bloq_raw = row.get('Indisponibilidade', '')
         
-        # TRADUZ AGORA MESMO (Ex: [0, 4])
         bloqueios_indices = traduzir_dias(bloq_raw)
 
         if not prof or not mat or not turmas_str: continue
@@ -79,8 +76,10 @@ def carregar_e_validar_dados(arquivo):
         lista_turmas = [t.strip() for t in turmas_str.replace(';', ',').split(',')]
         
         for turma in lista_turmas:
+            if not turma: continue
+            
             if turma not in turmas_config:
-                turmas_config[turma] = 25 # Cria turma se não existir
+                turmas_config[turma] = 25
             
             grade_aulas.append({
                 'id_linha': idx,
@@ -88,10 +87,11 @@ def carregar_e_validar_dados(arquivo):
                 'materia': mat,
                 'turma': turma,
                 'qtd': qtd,
-                'bloqueios_indices': bloqueios_indices # Aqui vai a lista [0, 4]
+                'bloqueios_indices': bloqueios_indices 
             })
 
-    # --- 4. EXPANSÃO ELÁSTICA ---
+    print(">>> FIM DA LEITURA.\n")
+
     demandas = {}
     for item in grade_aulas:
         t = item['turma']
@@ -100,7 +100,7 @@ def carregar_e_validar_dados(arquivo):
     for turma, carga_definida in turmas_config.items():
         carga_necessaria = demandas.get(turma, 0)
         if carga_necessaria > carga_definida:
-            avisos.append(f"⚠️ Turma {turma}: Pedidos {carga_necessaria} > Vagas {carga_definida}. Expandindo...")
+            avisos.append(f"⚠️ Turma {turma}: Pedidos {carga_necessaria} > Vagas {carga_definida}. Expandindo capacidade...")
             turmas_config[turma] = carga_necessaria 
 
     return turmas_config, grade_aulas, erros, avisos

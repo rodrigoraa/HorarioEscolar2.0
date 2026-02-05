@@ -8,7 +8,6 @@ def gerar_modelo_excel():
     """
     output = BytesIO()
     
-    # --- 1. Dados da Aba 'Turmas' ---
     df_turmas = pd.DataFrame([
         {'Turma': '6º Ano A', 'Aulas_Semanais': 25},
         {'Turma': '7º Ano B', 'Aulas_Semanais': 25},
@@ -16,7 +15,6 @@ def gerar_modelo_excel():
         {'Turma': '2º Ano Médio', 'Aulas_Semanais': 30},
     ])
     
-    # --- 2. Dados da Aba 'Grade_Curricular' ---
     df_grade = pd.DataFrame([
         {
             'Professor': 'Ana Silva', 
@@ -41,23 +39,17 @@ def gerar_modelo_excel():
         }
     ])
     
-    # --- 3. Escrita no Excel ---
-    # Usa o 'xlsxwriter' para poder formatar larguras de coluna
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         
-        # Aba Turmas
         df_turmas.to_excel(writer, sheet_name='Turmas', index=False)
-        # Ajuste de largura visual
         worksheet = writer.sheets['Turmas']
-        worksheet.set_column('A:A', 20) # Coluna Turma mais larga
+        worksheet.set_column('A:A', 20)
         worksheet.set_column('B:B', 15)
         
-        # Aba Grade
         df_grade.to_excel(writer, sheet_name='Grade_Curricular', index=False)
-        # Ajuste de largura visual
         worksheet = writer.sheets['Grade_Curricular']
-        worksheet.set_column('A:B', 20) # Prof e Materia
-        worksheet.set_column('C:C', 30) # Turmas (precisa ser largo)
+        worksheet.set_column('A:B', 20)
+        worksheet.set_column('C:C', 30)
         worksheet.set_column('D:E', 18)
 
     return output.getvalue()

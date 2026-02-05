@@ -11,7 +11,6 @@ from exporters import gerar_excel_colorido
 
 st.set_page_config(page_title="Gerar Horário Escolar", layout="wide")
 
-#-Login
 logado, nome_usuario, authenticator = verificar_login()
 
 if not logado:
@@ -24,7 +23,6 @@ with st.sidebar:
 
 st.title("🧩 Gerador de Horários")
 
-# --- MÓDULO DE DOWNLOAD DE MODELO ---
 with st.expander("📥 Baixar Modelo de Planilha", expanded=False):
     col_dl1, col_dl2 = st.columns([1, 2])
     
@@ -32,7 +30,6 @@ with st.expander("📥 Baixar Modelo de Planilha", expanded=False):
         st.markdown("### 1. Download")
         st.write("Baixe a planilha padrão:")
         
-        # Chama a função do novo arquivo
         excel_bytes = gerar_modelo_excel()
         
         st.download_button(
@@ -54,12 +51,10 @@ with st.expander("📥 Baixar Modelo de Planilha", expanded=False):
 
         """)
 
-# 1. UPLOAD
 arquivo = st.file_uploader("Upload da Planilha Excel", type=['xlsx'])
 
 if arquivo:
     try:
-        # 2. LEITURA E VALIDAÇÃO (Blindagem)
         turmas_config, grade_aulas, erros, avisos = carregar_e_validar_dados(arquivo)
     except Exception as e:
         st.error(f"❌ Erro Crítico: O arquivo enviado é inválido ou está corrompido.")
@@ -75,14 +70,11 @@ if arquivo:
         
     st.success("✅ Arquivo processado com sucesso!")
 
-    # --- DASHBOARD DE ESTATÍSTICAS ---
-    # 1. Cálculos
     qtd_professores = len(set([i['prof'] for i in grade_aulas]))
     qtd_disciplinas = len(set([i['materia'] for i in grade_aulas]))
     qtd_total_aulas = sum([i['qtd'] for i in grade_aulas])
     qtd_turmas = len(turmas_config)
 
-    # 2. Exibição Visual (Metrics)
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     
     kpi1.metric("👨‍🏫 Professores", qtd_professores)
@@ -90,33 +82,27 @@ if arquivo:
     kpi3.metric("📚 Disciplinas", qtd_disciplinas)
     kpi4.metric("⏱️ Total de Aulas", qtd_total_aulas)
     
-    st.divider() # Linha divisória para organizar
+    st.divider()
     
-    # 3. CONFIGURAÇÃO
     col1, col2 = st.columns(2)
     with col1:
         dias = st.multiselect("Dias Letivos", 
                             ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'], 
                             ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'])
     with col2:
-        # Opção para limitar carga horária diária
         st.info(f"Turmas detectadas: {len(turmas_config)}")
         
-        #HORA ATIVIDADE
     with st.expander("🕒 Gestão de Hora Atividade (H.A.)", expanded=False):
         st.markdown("Defina a quantidade de aulas dedicadas a planejamento para cada professor.")
         
-        # 1. Extrai lista única de professores
         lista_professores = sorted(list(set([i['prof'] for i in grade_aulas])))
         
-        # 2. Cria um DataFrame inicial para o editor
         df_ha_inicial = pd.DataFrame({
             "Professor": lista_professores,
             "tem_ha": [False] * len(lista_professores),
-            "qtd_aulas": [2] * len(lista_professores) # Padrão de 2 aulas
+            "qtd_aulas": [2] * len(lista_professores)
         })
         
-        # 3. Exibe o Editor de Dados (Tabela Editável)
         editor_ha = st.data_editor(
             df_ha_inicial,
             column_config={
@@ -132,31 +118,26 @@ if arquivo:
                     format="%d aulas"
                 )
             },
-            disabled=["Professor"], # Não deixa mudar o nome do professor
+            disabled=["Professor"],
             hide_index=True,
             use_container_width=True)
 
-    # CONFIGURAÇÃO DE ITINERÁRIOS
     with st.expander("⚙️ Configuração de Itinerários Formativos (Novo Ensino Médio)", expanded=False):
         st.markdown("Defina quais matérias são fixas e em quais horários elas devem ocorrer.")
         
-        # 1. Pega lista única de matérias do arquivo
         todas_materias = sorted(list(set([i['materia'] for i in grade_aulas])))
         
-        # 2. Selecionar Matérias
         itinerarios_selecionados = st.multiselect(
             "Quais disciplinas são Itinerários?", 
             todas_materias
         )
         
-        # 3. Selecionar Horários (Aulas 1 a 6)
         slots_itinerario_user = st.multiselect(
             "Em quais aulas os itinerários ocorrem?",
             options=[1, 2, 3, 4, 5, 6],
-            default=[6] # Padrão comum: últimas aulas
+            default=[6]
         )
         
-        # Converte para índice do python (0 a 5)
         slots_itinerario_idx = [s-1 for s in slots_itinerario_user]
         
         if 'grupos_sincronia' not in st.session_state:
@@ -168,10 +149,8 @@ if arquivo:
             *Útil para: Professores que atendem a escola toda no mesmo dia ou Projetos Interdisciplinares.*
             """)
             
-            # 1. Lista ÚNICA de matérias existentes no arquivo
             lista_materias = sorted(list(set([i['materia'] for i in grade_aulas])))
             
-            # 2. Multiselect simples
             selecao_materias = st.multiselect(
                 "Quais matérias devem cair no mesmo dia?",
                 options=lista_materias,
@@ -187,7 +166,6 @@ if arquivo:
                         st.session_state['grupos_sincronia'].append(selecao_materias)
                         st.success("Regra adicionada!")
 
-            # 3. Lista de Regras Ativas
             if st.session_state['grupos_sincronia']:
                 st.divider()
                 st.markdown("##### 🔗 Grupos Sincronizados:")
@@ -204,36 +182,30 @@ if arquivo:
         st.session_state['horario_gerado'] = False
         st.session_state['dados_solucao'] = {}
 
-    # --- BOTÃO DE EXECUÇÃO ---
     if st.button("🚀 Gerar Horário (Modo Blindado)"):
         
         with st.spinner("Preparando resultados. . ."):
             
-            # 1. PREPARAÇÃO DOS DADOS (Cria cópias para não alterar o original)
             turmas_final = turmas_config.copy()
             grade_final = grade_aulas.copy()
 
-            # 2. PROCESSAMENTO DE HORA ATIVIDADE (Se o editor existir e tiver dados)
             if 'editor_ha' in locals() and editor_ha is not None:
-                # Filtra apenas os marcados com TRUE
                 profs_com_ha = editor_ha[editor_ha["tem_ha"] == True]
                 
                 for _, row in profs_com_ha.iterrows():
                     prof_nome = row["Professor"]
                     qtd_ha = row["qtd_aulas"]
                     
-                    # Cria a turma fantasma
                     turma_fantasma = f"H.A. ({prof_nome})"
-                    turmas_final[turma_fantasma] = 25 # Define tamanho padrão
+                    turmas_final[turma_fantasma] = 25
                     
-                    # Adiciona o pedido de aula na grade
                     grade_final.append({
                         'id_linha': 9999,
                         'prof': prof_nome,
                         'materia': 'Hora Atividade',
                         'turma': turma_fantasma,
                         'qtd': int(qtd_ha),
-                        'bloqueios_indices': [] # H.A. respeita os bloqueios do prof automaticamente
+                        'bloqueios_indices': []
                     })
 
             erros_mat, avisos_mat = auditoria_pre_solver(grade_aulas, turmas_config, dias)
@@ -250,14 +222,11 @@ if arquivo:
                     st.write(f"- {am}")
 
         with st.spinner("Calculando a melhor solução possível. . ."):
-                # 3. VERIFICAÇÃO DE REGRAS DE PROJETO
             regras_projeto = st.session_state.get('regras_projetos', [])
 
-            # 4. EXECUÇÃO DO MOTOR
-            # Passamos as variáveis '_final' que contêm (ou não) as modificações
             status, resultados, slots_dia = rodar_solver(
-                turmas_final,           # Turmas originais + H.A.
-                grade_final,            # Grade original + H.A.
+                turmas_final,           
+                grade_final,            
                 dias,
                 itinerarios_selecionados,
                 slots_itinerario_idx,
@@ -286,7 +255,6 @@ if arquivo:
         s_dia = dados['slots_dia']
                 
         exibir_carga_horaria(res, d_sel)
-        # 5. VISUALIZAÇÃO NA TELA
         desenhar_grade(res, d_sel, s_dia)
                 
         st.divider()

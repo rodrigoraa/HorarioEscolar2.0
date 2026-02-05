@@ -6,7 +6,6 @@ from reportlab.lib.units import cm
 from io import BytesIO
 import pandas as pd
 
-# --- PALETA DE CORES (Minimalista) ---
 COR_CABECALHO = colors.Color(0.2, 0.2, 0.2)
 COR_TEXTO_CABECALHO = colors.white
 COR_LINHAS_GRADE = colors.black
@@ -19,13 +18,12 @@ def montar_tabela_turma(turma, df_t, dias_semana, styles):
     """
     Função auxiliar que cria a tabela (objeto Flowable) para uma única turma.
     """
-    # Título da Turma (Menor para caber duas na página)
     title_style = ParagraphStyle(
         'TurmaTitle',
         parent=styles['Heading2'],
         fontSize=14,
         textColor=colors.black,
-        alignment=1, # Alinhado à esquerda
+        alignment=1,
         spaceAfter=5
     )
     
@@ -35,14 +33,12 @@ def montar_tabela_turma(turma, df_t, dias_semana, styles):
     max_idx = df_t['aula_idx'].max()
     qtd_slots = max(5, int(max_idx) + 1)
     
-    # Cabeçalho da Tabela
     header = ['Horário'] + dias_semana
     data = [header]
     
     row_idx_intervalo = -1 
 
     for i in range(qtd_slots):
-        # Insere Intervalo após a 3ª aula (índice 3)
         if i == 3:
             row_intervalo = ["INTERVALO"] * (len(dias_semana) + 1)
             data.append(row_intervalo)
@@ -54,23 +50,18 @@ def montar_tabela_turma(turma, df_t, dias_semana, styles):
             if not aula.empty:
                 materia = aula.iloc[0]['materia']
                 prof = aula.iloc[0]['prof']
-                # Fonte ajustada: Matéria size 9 (evita quebra), Prof size 7
                 texto_celula = f"<font size=9><b>{materia}</b></font><br/><font size=7 color='grey'>{prof}</font>"
             else:
                 texto_celula = "-"
             
-            # Paragraph permite que o texto se ajuste melhor que string pura
             cell_style = ParagraphStyle('CellStyle', parent=styles['Normal'], alignment=1, leading=8)
             row.append(Paragraph(texto_celula, cell_style))
         
         data.append(row)
 
-    # Configuração da Tabela
-    # Aumenta a largura das colunas de dias para 4.8cm (antes era 4cm)
     tabela = Table(data, colWidths=[2.2*cm] + [4.8*cm]*len(dias_semana))
     
     estilos_tabela = [
-        # Cabeçalho
         ('BACKGROUND', (0, 0), (-1, 0), COR_CABECALHO),
         ('TEXTCOLOR', (0, 0), (-1, 0), COR_TEXTO_CABECALHO),
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
@@ -79,24 +70,20 @@ def montar_tabela_turma(turma, df_t, dias_semana, styles):
         ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
         ('TOPPADDING', (0, 0), (-1, 0), 6),
         
-        # Grade Geral
         ('GRID', (0, 0), (-1, -1), 0.5, COR_LINHAS_GRADE),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         
-        # Coluna de Horários
         ('BACKGROUND', (0, 1), (0, -1), COR_FUNDO_HORARIO),
         ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
         ('ALIGN', (0, 1), (0, -1), 'CENTER'),
         ('FONTSIZE', (0, 1), (0, -1), 8),
     ]
 
-    # Zebra Striping
     for i in range(1, len(data)):
         if i == row_idx_intervalo: continue
         bg_color = COR_ZEBRA_IMPAR if i % 2 == 1 else COR_ZEBRA_PAR
         estilos_tabela.append(('BACKGROUND', (1, i), (-1, i), bg_color))
 
-    # Estilo do Intervalo
     if row_idx_intervalo != -1:
         estilos_tabela.append(('SPAN', (0, row_idx_intervalo), (-1, row_idx_intervalo)))
         estilos_tabela.append(('BACKGROUND', (0, row_idx_intervalo), (-1, row_idx_intervalo), COR_INTERVALO))
@@ -114,7 +101,6 @@ def montar_tabela_turma(turma, df_t, dias_semana, styles):
 def gerar_pdf_bonito(resultados, turmas_config, dias_semana):
     buffer = BytesIO()
     
-    # Margens menores (1cm) para aproveitar espaço
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
@@ -133,30 +119,24 @@ def gerar_pdf_bonito(resultados, turmas_config, dias_semana):
     df = pd.DataFrame(resultados)
     turmas_ordenadas = sorted(list(turmas_config.keys()))
     
-    # Filtra apenas turmas que têm horário gerado
     turmas_validas = [t for t in turmas_ordenadas if t in df['turma'].values]
 
-    # --- LOOP DE 2 EM 2 (PARES) ---
     for i in range(0, len(turmas_validas), 2):
         
-        # Pega a Turma 1
         turma1 = turmas_validas[i]
         df_t1 = df[df['turma'] == turma1]
         objs1 = montar_tabela_turma(turma1, df_t1, dias_semana, styles)
         elements.extend(objs1)
         
-        # Verifica se existe Turma 2
         if i + 1 < len(turmas_validas):
             turma2 = turmas_validas[i+1]
             df_t2 = df[df['turma'] == turma2]
             
-            # Adiciona Espaço entre as tabelas (1.5cm)
             elements.append(Spacer(1, 1.5*cm))
             
             objs2 = montar_tabela_turma(turma2, df_t2, dias_semana, styles)
             elements.extend(objs2)
         
-        # Quebra de Página apenas após colocar o par (ou a última sozinha)
         elements.append(PageBreak())
 
     doc.build(elements)
